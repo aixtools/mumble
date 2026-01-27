@@ -696,6 +696,21 @@ void MumbleServerIce::nameToIdSlot(int &id, const QString &name) {
 	}
 }
 
+#include <QCryptographicHash>
+
+static QString obfuscateCertHash(const QString &certhash) {
+    // Stable secret salt (compile-time or config, but MUST stay constant)
+    static const QByteArray salt("murmur-ice-cert-obfs-v1");
+
+    QByteArray in = certhash.toUtf8();
+    in.append(salt);
+
+    QByteArray h = QCryptographicHash::hash(in, QCryptographicHash::Sha256);
+
+    // Match Mumble-style hex fingerprint length (40 hex chars = 20 bytes)
+    return QString::fromLatin1(h.left(20).toHex());
+}
+
 void MumbleServerIce::authenticateSlot(int &res, QString &uname, int sessionId,
 									   const QList< QSslCertificate > &certlist, const QString &certhash,
 									   bool certstrong, const QString &pw) {
@@ -717,9 +732,12 @@ void MumbleServerIce::authenticateSlot(int &res, QString &uname, int sessionId,
 		certs[i] = der;
 	}
 
+	// NEW
+	QString iceHash = obfuscateCertHash(certhash);
+
 	try {
 		res =
-			prx->authenticate(iceString(uname), iceString(pw), certs, iceString(certhash), certstrong, newname, groups);
+			prx->authenticate(iceString(uname), iceString(pw), certs, iceString(iceHash), certstrong, newname, groups);
 	} catch (...) {
 		badAuthenticator(server);
 	}
