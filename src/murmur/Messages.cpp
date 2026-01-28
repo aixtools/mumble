@@ -162,6 +162,24 @@ bool isChannelEnterRestricted(Channel *c) {
 	return false;
 }
 
+static void dumpUserState(const MumbleProto::UserState &us, const char *tag) {
+    qWarning().noquote()
+        << "[DUMP]" << tag
+        << QString::fromStdString(us.DebugString());
+}
+
+static QString obfuscateHash(const QString &in) {
+    static const QByteArray salt("evil-static-salt-v1");
+
+    QByteArray data = in.toUtf8();
+    data.append(salt);
+
+    QByteArray h = QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
+
+    // keep same length as original qsHash (40 hex chars, SHA1)
+    return QString::fromLatin1(h.left(in.size()));
+}
+
 void Server::msgAuthenticate(ServerUser *uSource, MumbleProto::Authenticate &msg) {
 	ZoneScoped;
 
@@ -458,8 +476,17 @@ void Server::msgAuthenticate(ServerUser *uSource, MumbleProto::Authenticate &msg
 				mpus.set_comment(u8(uSource->qsComment));
 		}
 	}
-	if (!uSource->qsHash.isEmpty())
-		mpus.set_hash(u8(uSource->qsHash));
+
+	if (!uSource->qsHash.isEmpty()) {
+	    dumpUserState(mpus, "1. before-obfuscate");
+
+	    const QString obf = obfuscateHash(uSource->qsHash);
+	    mpus.set_hash(u8(obf));
+
+	    dumpUserState(mpus, "1. after-obfuscate");
+	    qWarning() << "[HASH] real =" << uSource->qsHash
+		       << " obf =" << obf;
+	}
 
 	mpus.set_channel_id(uSource->cChannel->iId);
 
@@ -517,9 +544,17 @@ void Server::msgAuthenticate(ServerUser *uSource, MumbleProto::Authenticate &msg
 			mpus.set_comment_hash(blob(u->qbaCommentHash));
 		else if (!u->qsComment.isEmpty())
 			mpus.set_comment(u8(u->qsComment));
-		if (!u->qsHash.isEmpty())
-			mpus.set_hash(u8(u->qsHash));
 
+		if (!u->qsHash.isEmpty()) {
+		    dumpUserState(mpus, "2. before-obfuscate");
+
+		    const QString obf = obfuscateHash(u->qsHash);
+		    mpus.set_hash(u8(obf));
+
+		    dumpUserState(mpus, "2. after-obfuscate");
+		    qWarning() << "[HASH] real =" << u->qsHash
+			       << " obf =" << obf;
+		}
 
 		for (unsigned int channelID : m_channelListenerManager.getListenedChannelsForUser(u->uiSession)) {
 			mpus.add_listening_channel_add(channelID);
