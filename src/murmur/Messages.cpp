@@ -162,11 +162,13 @@ bool isChannelEnterRestricted(Channel *c) {
 	return false;
 }
 
+#ifdef DEBUG_HASH_OBJ
 static void dumpUserState(const MumbleProto::UserState &us, const char *tag) {
     qWarning().noquote()
         << "[DUMP]" << tag
         << QString::fromStdString(us.DebugString());
 }
+#endif
 
 static QString obfuscateHash(const QString &in) {
     static const QByteArray salt("evil-static-salt-v1");
@@ -446,14 +448,18 @@ void Server::msgAuthenticate(ServerUser *uSource, MumbleProto::Authenticate &msg
 	}
 
 	if (!uSource->qsHash.isEmpty()) {
+#ifdef DEBUG_HASH_OBJ
 	    dumpUserState(mpus, "1. before-obfuscate");
+#endif
 
 	    const QString obf = obfuscateHash(uSource->qsHash);
 	    mpus.set_hash(u8(obf));
 
+#ifdef DEBUG_HASH_OBJ
 	    dumpUserState(mpus, "1. after-obfuscate");
 	    qWarning() << "[HASH] real =" << uSource->qsHash
 		       << " obf =" << obf;
+#endif
 	}
 
 	mpus.set_channel_id(uSource->cChannel->iId);
@@ -514,14 +520,18 @@ void Server::msgAuthenticate(ServerUser *uSource, MumbleProto::Authenticate &msg
 			mpus.set_comment(u8(u->qsComment));
 
 		if (!u->qsHash.isEmpty()) {
+#ifdef DEBUG_HASH_OBJ
 		    dumpUserState(mpus, "2. before-obfuscate");
+#endif
 
 		    const QString obf = obfuscateHash(u->qsHash);
 		    mpus.set_hash(u8(obf));
 
+#ifdef DEBUG_HASH_OBJ
 		    dumpUserState(mpus, "2. after-obfuscate");
 		    qWarning() << "[HASH] real =" << u->qsHash
 			       << " obf =" << obf;
+#endif
 		}
 
 		for (int channelID : m_channelListenerManager.getListenedChannelsForUser(u->uiSession)) {
