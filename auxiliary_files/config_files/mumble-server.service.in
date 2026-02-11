@@ -31,7 +31,7 @@ Restart=always
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 Type=simple
-User=_mumble-server
+User=mumble-server
 
 [Install]
 WantedBy=multi-user.target
